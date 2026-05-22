@@ -3,12 +3,13 @@
   "displayName": "Synapse Blueprint",
   "description": "A live project node map that any LLM installed in VS Code can read and update — components, features, decisions, dependencies, todos and problems tracked as an interactive graph.",
   "version": "1.0.0",
-  "publisher": "synapse-tools",
+  "publisher": "d3bas3-ai",
+  "author": "d3bas3-ai",
   "icon": "icon.png",
   "license": "CC-BY-NC-4.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/synapse-tools/synapse-blueprint"
+    "url": "https://github.com/d3bas3-ai/synapse-blueprint"
   },
   "engines": { "vscode": "^1.99.0" },
   "categories": ["Other", "Visualization", "Programming Languages"],
