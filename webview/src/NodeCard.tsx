@@ -79,7 +79,10 @@ export function NodeCard({ node, nodes, edges, onUpdate, onRemove, onRemoveEdge,
                 style={{ fontWeight:700, fontSize:15, color:'#f9fafb', background:'#0d0d14', border:'1px solid #374151', borderRadius:4, padding:'2px 6px', width:'100%', fontFamily:'inherit' }}
                 autoFocus />
             ) : (
-              <div onClick={() => setEditLabel(true)} style={{ fontWeight:700, fontSize:15, color:'#f9fafb', cursor:'text' }}>{node.label}</div>
+              <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+                <div onClick={() => setEditLabel(true)} style={{ fontWeight:700, fontSize:15, color:'#f9fafb', cursor:'text' }}>{node.label}</div>
+                {node.seq && <span style={{ fontSize:10, color:'#4b5563', fontFamily:'monospace', fontWeight:700, flexShrink:0 }}>#{node.seq}</span>}
+              </div>
             )}
             <div style={{ marginTop: 4 }}>
               {editFilePath ? (

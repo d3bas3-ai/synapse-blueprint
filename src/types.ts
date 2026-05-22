@@ -14,6 +14,7 @@ export type NodePriority = 'high' | 'medium' | 'low';
 
 export interface BlueprintNode {
   id: string;
+  seq?: number;        // stable creation-order number, never changes after assignment
   label: string;
   type: NodeType;
   status: NodeStatus;
@@ -46,6 +47,7 @@ export interface Blueprint {
   updated_at: string;
   nodes: BlueprintNode[];
   edges: BlueprintEdge[];
+  nextSeq?: number;    // monotonic counter — only goes up, never reset
   // Undo system
   undo_pending?: boolean;
   undo_diff?: { snapshot_time: string; changes: string[] };

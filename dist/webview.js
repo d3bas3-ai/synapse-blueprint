@@ -24039,7 +24039,7 @@
         style: { fontWeight: 700, fontSize: 15, color: "#f9fafb", background: "#0d0d14", border: "1px solid #374151", borderRadius: 4, padding: "2px 6px", width: "100%", fontFamily: "inherit" },
         autoFocus: true
       }
-    ) : /* @__PURE__ */ import_react3.default.createElement("div", { onClick: () => setEditLabel(true), style: { fontWeight: 700, fontSize: 15, color: "#f9fafb", cursor: "text" } }, node.label), /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginTop: 4 } }, editFilePath ? /* @__PURE__ */ import_react3.default.createElement(
+    ) : /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 6 } }, /* @__PURE__ */ import_react3.default.createElement("div", { onClick: () => setEditLabel(true), style: { fontWeight: 700, fontSize: 15, color: "#f9fafb", cursor: "text" } }, node.label), node.seq && /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontSize: 10, color: "#4b5563", fontFamily: "monospace", fontWeight: 700, flexShrink: 0 } }, "#", node.seq)), /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginTop: 4 } }, editFilePath ? /* @__PURE__ */ import_react3.default.createElement(
       "input",
       {
         value: filePath,
@@ -24337,7 +24337,21 @@
       justifyContent: "center",
       border: "1.5px solid #0d0d14",
       zIndex: 2
-    } }, "U"), /* @__PURE__ */ import_react5.default.createElement(
+    } }, "U"), n.seq && /* @__PURE__ */ import_react5.default.createElement("div", { style: {
+      position: "absolute",
+      top: -7,
+      right: -7,
+      background: "#1f2937",
+      color: "#4b5563",
+      borderRadius: 4,
+      padding: "1px 5px",
+      fontSize: 9,
+      fontWeight: 700,
+      fontFamily: "monospace",
+      lineHeight: 1.4,
+      border: "1px solid #374151",
+      zIndex: 2
+    } }, "#", n.seq), /* @__PURE__ */ import_react5.default.createElement(
       Handle,
       {
         type: "target",
@@ -24904,6 +24918,13 @@
             textOverflow: "ellipsis",
             whiteSpace: "nowrap"
           } }, n.label),
+          n.seq && /* @__PURE__ */ import_react5.default.createElement("span", { style: {
+            fontSize: 9,
+            color: "#4b5563",
+            fontFamily: "monospace",
+            fontWeight: 700,
+            flexShrink: 0
+          } }, "#", n.seq),
           n.source === "user" && /* @__PURE__ */ import_react5.default.createElement("span", { style: {
             fontSize: 9,
             fontWeight: 800,

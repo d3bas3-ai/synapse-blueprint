@@ -22,6 +22,28 @@ const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT ?? process.cwd();
 const SNAPSHOT_SLOTS = 5;
 const CHANGELOG_CAP  = 500;
 
+// ── Drift detection ────────────────────────────────────────────────────────────
+// Tracks whether workspace files changed since the LLM last updated the map.
+let lastMapUpdateTime  = Date.now();
+let lastFileChangeTime = 0;
+let seqMigrated        = false;
+
+const SOURCE_EXTS = new Set(['.ts','.tsx','.js','.jsx','.mjs','.cjs','.py','.go','.rs','.java','.cs','.cpp','.c','.rb','.php','.swift','.kt','.css','.scss','.html','.vue','.svelte']);
+const IGNORE_DIRS = ['node_modules', '.git', 'dist', '.vsix', '__pycache__', '.next', 'out'];
+
+if (WORKSPACE_ROOT && fs.existsSync(WORKSPACE_ROOT)) {
+  try {
+    fs.watch(WORKSPACE_ROOT, { recursive: true }, (_event, filename) => {
+      if (!filename) return;
+      const normalized = filename.replace(/\\/g, '/');
+      if (IGNORE_DIRS.some(d => normalized.includes(`/${d}/`) || normalized.startsWith(`${d}/`))) return;
+      if (SOURCE_EXTS.has(path.extname(filename).toLowerCase())) {
+        lastFileChangeTime = Date.now();
+      }
+    });
+  } catch { /* watch unavailable — drift detection disabled */ }
+}
+
 // ── Server instructions (injected into LLM context at MCP initialize) ─────────
 function buildServerInstructions(projectName: string): string {
   const name = projectName || 'this project';
@@ -38,12 +60,12 @@ You are connected to the Synapse node map for **${name}**.
 ## File operations — every time you touch a file
 
 4. Created or wrote a file → call \`synapse_add_node\` immediately, in the same step, before moving on.
-5. Modified an existing file → call \`synapse_update_node\` immediately, in the same step.
+5. Modified an existing file → call \`synapse_update_node\` immediately, in the same step. Do not batch updates — one file edit, one tool call.
 6. Found a relationship between components → call \`synapse_link\`.
 
-## Before modifying anything
+## Before modifying anything — MANDATORY
 
-7. Call \`synapse_impact\` with the node's ID before changing any node or its file. It shows every upstream and downstream node affected — the full blast radius. This is the primary guardrail against destructive changes.
+7. You MUST call \`synapse_impact\` before editing any file or node. Do not write a single line of code until you have read the impact output. This is non-negotiable. An LLM that skips this step is operating blind and will cause destructive changes.
 
 ## Completing work
 
@@ -56,26 +78,26 @@ You are connected to the Synapse node map for **${name}**.
 
 ## Tool schemas
 
-9. Synapse tool schemas are session-scoped and may be deferred. Load them at session start before any calls or you will get a schema error.
+11. Synapse tool schemas are session-scoped and may be deferred. Load them at session start before any calls or you will get a schema error.
 
 ## User-created nodes  [USER] in context · [U] in summary
 
-10. Nodes marked [USER] were placed by the user directly on the canvas. They are protected.
-11. Before modifying a user node: tell the user which node(s) you need to change and why, wait for their explicit confirmation, then call \`synapse_update_node\` with confirmed: true. Batch confirmation for a group of nodes within the same task is fine.
-12. "Remove all", "clean up", "delete everything", or any other general instruction does NOT count as permission for user nodes. Permission means the user specifically names or confirms a specific node in direct response to your question.
-13. \`synapse_remove_node\` is hard-blocked for user nodes without confirmed: true. Always ask first — the tool will reject the call otherwise.
-14. Permission is task-scoped. Each new task starts with protection fully reinstated.
-15. After a rollback, list which user-created nodes were left untouched so the user can review them.
+12. Nodes marked [USER] were placed by the user directly on the canvas. They are protected.
+13. Before modifying a user node: tell the user which node(s) you need to change and why, wait for their explicit confirmation, then call \`synapse_update_node\` with confirmed: true. Batch confirmation for a group of nodes within the same task is fine.
+14. "Remove all", "clean up", "delete everything", or any other general instruction does NOT count as permission for user nodes. Permission means the user specifically names or confirms a specific node in direct response to your question.
+15. \`synapse_remove_node\` is hard-blocked for user nodes without confirmed: true. Always ask first — the tool will reject the call otherwise.
+16. Permission is task-scoped. Each new task starts with protection fully reinstated.
+17. After a rollback, list which user-created nodes were left untouched so the user can review them.
 
 ## Closing nodes correctly
 
-16. User-added todo and problem nodes are task assignments — treat them as explicit user requests, not just notes to acknowledge.
-17. When closing a node: set status=done, flip type to done, write root cause in description, write exact fix location (file, line, function) in notes.
-18. description = what was wrong and what was found. notes = exact file, line, function.
+18. User-added todo and problem nodes are task assignments — treat them as explicit user requests, not just notes to acknowledge.
+19. When closing a node: set status=done, flip type to done, write root cause in description, write exact fix location (file, line, function) in notes.
+20. description = what was wrong and what was found. notes = exact file, line, function.
 
 ## Node descriptions from the user
 
-19. User-added node descriptions express intent, not full specification. Investigate the actual code before acting — do not treat the description as a complete spec.`;
+21. User-added node descriptions express intent, not full specification. Investigate the actual code before acting — do not treat the description as a complete spec.`;
 }
 
 // ── File helpers ──────────────────────────────────────────────────────────────
@@ -97,6 +119,21 @@ function read(): Blueprint {
 function write(b: Blueprint) {
   b.updated_at = new Date().toISOString();
   fs.writeFileSync(BLUEPRINT_PATH, JSON.stringify(b, null, 2), 'utf-8');
+  lastMapUpdateTime = Date.now();
+}
+
+function ensureSeq(b: Blueprint): boolean {
+  if (seqMigrated || b.nextSeq) { seqMigrated = true; return false; }
+  const sorted = [...b.nodes].sort((a, c) =>
+    new Date(a.created_at).getTime() - new Date(c.created_at).getTime()
+  );
+  sorted.forEach((n, i) => {
+    const node = b.nodes.find(x => x.id === n.id)!;
+    if (!node.seq) (node as any).seq = i + 1;
+  });
+  b.nextSeq = b.nodes.length + 1;
+  seqMigrated = true;
+  return true; // caller must write(b)
 }
 
 function appendChangelog(action: string, label: string, details?: string) {
@@ -287,6 +324,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ── synapse_summary ────────────────────────────────────────────────────
       case 'synapse_summary': {
         const b = read();
+        if (ensureSeq(b)) write(b);
         const lines = [
           `# ${b.project} — Quick Map`,
           `${b.nodes.length} nodes, ${b.edges.length} edges`,
@@ -300,11 +338,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             .map(e => b.nodes.find(x => x.id === e.source)?.label ?? e.source);
           const pri     = n.priority ? `, ${n.priority}` : '';
           const userTag = n.source === 'user' ? ' [U]' : '';
+          const seqTag  = n.seq ? `#${n.seq} ` : '';
           const conn    = [
             inc.length ? `← ${inc.join(', ')}` : '',
             out.length ? `→ ${out.join(', ')}` : '',
           ].filter(Boolean).join('  ');
-          lines.push(`[${n.type}] ${n.label}${userTag} (${n.status}${pri})${conn ? '  ' + conn : ''}`);
+          lines.push(`[${n.type}] ${seqTag}${n.label}${userTag} (${n.status}${pri})${conn ? '  ' + conn : ''}`);
         }
         return { content: [{ type: 'text', text: lines.join('\n') }] };
       }
@@ -312,6 +351,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ── synapse_context ────────────────────────────────────────────────────
       case 'synapse_context': {
         const b = read();
+        if (ensureSeq(b)) write(b);
         const lines: string[] = [];
 
         // Rollback notice — shown if the user just did an undo from the canvas
@@ -364,6 +404,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         lines.push(`  blocked:     ${byStatus('blocked').length}`);
         lines.push('', '## Nodes');
 
+        // Drift warning — injected before node list if files changed since last map update
+        if (lastFileChangeTime > lastMapUpdateTime) {
+          lines.push('┌─────────────────────────────────────────────────────┐');
+          lines.push('│  ⚠ DRIFT WARNING                                    │');
+          lines.push('│  Workspace files changed since your last map update. │');
+          lines.push('│  Call synapse_update_node for any files you edited,  │');
+          lines.push('│  then run synapse_validate to check for stale paths. │');
+          lines.push('└─────────────────────────────────────────────────────┘');
+          lines.push('');
+        }
+
         for (const node of nodes) {
           const inc = b.edges.filter(e => e.target === node.id)
             .map(e => { const s = b.nodes.find(n => n.id === e.source); return s ? `${s.label}${e.label ? ' ['+e.label+']' : ''}` : e.source; });
@@ -371,7 +422,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             .map(e => { const t = b.nodes.find(n => n.id === e.target); return t ? `${t.label}${e.label ? ' ['+e.label+']' : ''}` : e.target; });
           const pri     = node.priority     ? `  priority: ${node.priority}` : '';
           const userTag = node.source === 'user' ? '  [USER]' : '';
-          lines.push(`### [${node.type}] ${node.label}  (${node.status})${userTag}  ID: ${node.id}${pri}`);
+          const seqTag  = node.seq ? `#${node.seq} ` : '';
+          lines.push(`### [${node.type}] ${seqTag}${node.label}  (${node.status})${userTag}  ID: ${node.id}${pri}`);
           if (node.file_path) lines.push(`File: ${node.file_path}`);
           lines.push(node.description);
           if (node.notes) lines.push(`Notes: ${node.notes}`);
@@ -401,10 +453,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ── synapse_add_node ───────────────────────────────────────────────────
       case 'synapse_add_node': {
         const b = read();
+        if (ensureSeq(b)) { /* seq will be set below — write happens in write(b) */ }
+        const seq = b.nextSeq ?? (b.nodes.length + 1);
+        b.nextSeq = seq + 1;
         const col = b.nodes.length % 4;
         const row = Math.floor(b.nodes.length / 4);
         const node: BlueprintNode = {
-          id: uuidv4(), label: String(a.label),
+          id: uuidv4(), seq, label: String(a.label),
           type:     (a.type     as any) ?? 'component',
           status:   (a.status   as any) ?? 'planned',
           priority: (a.priority as any) ?? undefined,
@@ -421,7 +476,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         b.nodes.push(node);
         write(b);
         appendChangelog('added', node.label, `${node.type}, ${node.status}`);
-        return { content: [{ type: 'text', text: `Node added: ${node.label} (ID: ${node.id})` }] };
+        return { content: [{ type: 'text', text: `Node added: #${seq} ${node.label} (ID: ${node.id})` }] };
       }
 
       // ── synapse_update_node ────────────────────────────────────────────────
@@ -567,8 +622,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
         const total = upstream.length + downstream.length;
+        const seqTag = startNode.seq ? `#${startNode.seq} ` : '';
         const lines = [
-          `# Impact Analysis: ${startNode.label}`,
+          `# Impact Analysis: ${seqTag}${startNode.label}`,
           `[${startNode.type}] ${startNode.status}${startNode.file_path ? ' — ' + startNode.file_path : ''}`,
           `${total} connected node(s)`,
           '',
@@ -577,7 +633,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           lines.push('## ← Upstream (these nodes point to this one)');
           for (const { node, hop } of upstream.sort((a, b) => a.hop - b.hop)) {
             const pri = node.priority ? ` [${node.priority}]` : '';
-            lines.push(`  hop ${hop}: [${node.type}] ${node.label} (${node.status}${pri})${node.file_path ? ' — ' + node.file_path : ''}  ID: ${node.id}`);
+            const sq  = node.seq ? `#${node.seq} ` : '';
+            lines.push(`  hop ${hop}: [${node.type}] ${sq}${node.label} (${node.status}${pri})${node.file_path ? ' — ' + node.file_path : ''}  ID: ${node.id}`);
           }
           lines.push('');
         }
@@ -585,7 +642,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           lines.push('## → Downstream (this node points to these)');
           for (const { node, hop } of downstream.sort((a, b) => a.hop - b.hop)) {
             const pri = node.priority ? ` [${node.priority}]` : '';
-            lines.push(`  hop ${hop}: [${node.type}] ${node.label} (${node.status}${pri})${node.file_path ? ' — ' + node.file_path : ''}  ID: ${node.id}`);
+            const sq  = node.seq ? `#${node.seq} ` : '';
+            lines.push(`  hop ${hop}: [${node.type}] ${sq}${node.label} (${node.status}${pri})${node.file_path ? ' — ' + node.file_path : ''}  ID: ${node.id}`);
           }
           lines.push('');
         }
@@ -620,8 +678,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (stale.length) {
           lines.push(`## Stale file paths (${stale.length})`);
           lines.push('These nodes reference files that no longer exist:');
-          for (const node of stale)
-            lines.push(`  [${node.type}] ${node.label} — ${node.file_path}  ID: ${node.id}`);
+          for (const node of stale) {
+            const sq = node.seq ? `#${node.seq} ` : '';
+            lines.push(`  [${node.type}] ${sq}${node.label} — ${node.file_path}  ID: ${node.id}`);
+          }
           lines.push('');
           lines.push('ACTION: Update or clear file_path for each stale node via synapse_update_node.');
           lines.push('');
@@ -629,8 +689,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (unanchored.length) {
           lines.push(`## Unanchored nodes (${unanchored.length})`);
           lines.push('Component/todo/problem nodes with no file_path — consider adding one:');
-          for (const node of unanchored.slice(0, 10))
-            lines.push(`  [${node.type}] ${node.label}  ID: ${node.id}`);
+          for (const node of unanchored.slice(0, 10)) {
+            const sq = node.seq ? `#${node.seq} ` : '';
+            lines.push(`  [${node.type}] ${sq}${node.label}  ID: ${node.id}`);
+          }
           if (unanchored.length > 10) lines.push(`  … and ${unanchored.length - 10} more`);
           lines.push('');
         }

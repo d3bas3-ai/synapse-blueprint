@@ -141,7 +141,20 @@ var BlueprintStore = class {
     this.filePath = path.join(storageDir, "blueprint.json");
     this.snapshotDir = storageDir;
     this.blueprint = this.load(projectName);
+    this.migrateSeq();
     this.initSnapshotSlot();
+  }
+  migrateSeq() {
+    if (this.blueprint.nextSeq) return;
+    const sorted = [...this.blueprint.nodes].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    sorted.forEach((n, i) => {
+      const node = this.blueprint.nodes.find((x) => x.id === n.id);
+      if (!node.seq) node.seq = i + 1;
+    });
+    this.blueprint.nextSeq = this.blueprint.nodes.length + 1;
+    this.save();
   }
   load(projectName) {
     if (fs.existsSync(this.filePath)) {
@@ -206,9 +219,12 @@ var BlueprintStore = class {
   }
   // ── Node ops ─────────────────────────────────────────────────────────────────
   addNode(fields) {
+    const seq = this.blueprint.nextSeq ?? this.blueprint.nodes.length + 1;
+    this.blueprint.nextSeq = seq + 1;
     const node = {
       ...fields,
       id: v4_default(),
+      seq,
       created_at: (/* @__PURE__ */ new Date()).toISOString(),
       updated_at: (/* @__PURE__ */ new Date()).toISOString()
     };

@@ -68,6 +68,16 @@ function BlueprintNodeComponent({ data, selected }: { data: { blueprint: Bluepri
           border: '1.5px solid #0d0d14', zIndex: 2,
         }}>U</div>
       )}
+      {/* Sequence number badge — top-right corner */}
+      {n.seq && (
+        <div style={{
+          position: 'absolute', top: -7, right: -7,
+          background: '#1f2937', color: '#4b5563',
+          borderRadius: 4, padding: '1px 5px',
+          fontSize: 9, fontWeight: 700, fontFamily: 'monospace', lineHeight: 1.4,
+          border: '1px solid #374151', zIndex: 2,
+        }}>#{n.seq}</div>
+      )}
       <Handle type="target" position={Position.Top}
         style={{ background: color, border: 'none', width: 8, height: 8 }} />
       <Handle type="source" position={Position.Bottom}
@@ -612,11 +622,15 @@ export function App() {
                         background:dc, display:'inline-block',
                         boxShadow:`0 0 4px ${dc}88` }} />
                     ); })()}
-                    {/* Node label */}
+                    {/* Node label + seq */}
                     <span style={{ fontSize:12, color:'#e5e7eb', fontWeight:500, flex:1,
                       overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                       {n.label}
                     </span>
+                    {n.seq && (
+                      <span style={{ fontSize:9, color:'#4b5563', fontFamily:'monospace',
+                        fontWeight:700, flexShrink:0 }}>#{n.seq}</span>
+                    )}
                     {/* User badge */}
                     {n.source === 'user' && (
                       <span style={{ fontSize:9, fontWeight:800, color:'#f59e0b',
