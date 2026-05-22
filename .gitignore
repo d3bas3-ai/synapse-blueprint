@@ -1,0 +1,22 @@
+# Compiled output
+dist/
+
+# Node modules
+node_modules/
+
+# VS Code workspace storage (private blueprint data)
+.vscode-storage/
+
+# Packaged extension
+*.vsix
+
+# Environment and local config
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.idea/

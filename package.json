@@ -1,0 +1,109 @@
+{
+  "name": "synapse",
+  "displayName": "Synapse Blueprint",
+  "description": "A live project node map that any LLM installed in VS Code can read and update — components, features, decisions, dependencies, todos and problems tracked as an interactive graph.",
+  "version": "1.0.0",
+  "publisher": "synapse-tools",
+  "icon": "icon.png",
+  "license": "CC-BY-NC-4.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/synapse-tools/synapse-blueprint"
+  },
+  "engines": { "vscode": "^1.99.0" },
+  "categories": ["Other", "Visualization", "Programming Languages"],
+  "keywords": ["llm", "mcp", "ai", "blueprint", "node map", "context", "graph", "claude", "copilot", "cline"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:synapse.open",
+    "onCommand:synapse.reset",
+    "onCommand:synapse.walkthrough"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "synapse.open",        "title": "Synapse: Open Canvas" },
+      { "command": "synapse.reset",       "title": "Synapse: Reset Project Map" },
+      { "command": "synapse.walkthrough", "title": "Synapse: Setup Walkthrough" }
+    ],
+    "keybindings": [
+      {
+        "command": "synapse.open",
+        "key": "ctrl+shift+y",
+        "mac": "cmd+shift+y"
+      },
+      {
+        "command": "synapse.walkthrough",
+        "key": "ctrl+shift+alt+s",
+        "mac": "cmd+shift+alt+s"
+      }
+    ],
+    "configuration": {
+      "title": "Synapse",
+      "properties": {
+        "synapse.autoOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open the Synapse canvas when a project with an existing map is opened in VS Code."
+        }
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "synapse.setup",
+        "title": "Set up Synapse",
+        "description": "Connect your LLM to the Synapse project map",
+        "steps": [
+          {
+            "id": "synapse.setup.welcome",
+            "title": "What Synapse does",
+            "description": "Synapse maintains a live node graph of your project — components, features, decisions, dependencies, todos and problems. Your LLM reads and updates it automatically so every session starts with full context.\n\nOpen the canvas any time with **Ctrl+Shift+Y**.",
+            "media": { "markdown": "media/walkthrough/welcome.md" }
+          },
+          {
+            "id": "synapse.setup.llm",
+            "title": "Connect your LLM",
+            "description": "Synapse auto-detects LLMs installed in VS Code and writes the MCP configuration for each one. If auto-detection missed yours, follow the manual steps below.\n\n[Open Manual Setup Guide](command:synapse.walkthrough)",
+            "media": { "markdown": "media/walkthrough/llm-setup.md" }
+          },
+          {
+            "id": "synapse.setup.open",
+            "title": "Open your first canvas",
+            "description": "Press **Ctrl+Shift+Y** or run **Synapse: Open Canvas** from the command palette.\n\n[Open Canvas](command:synapse.open)",
+            "media": { "markdown": "media/walkthrough/canvas.md" },
+            "completionEvents": ["onCommand:synapse.open"]
+          },
+          {
+            "id": "synapse.setup.llm-prompt",
+            "title": "Ask your LLM to map the project",
+            "description": "In your LLM terminal/chat, run:\n\n```\nUse the Synapse MCP tools only — no text output.\nCall synapse_set_project first, then synapse_add_node\nfor every module, file, and dependency, then synapse_link\nto wire them together. Tools only.\n```",
+            "media": { "markdown": "media/walkthrough/prompt.md" }
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "build":   "node esbuild.js",
+    "watch":   "node esbuild.js --watch",
+    "package": "npm run build && npx @vscode/vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@xyflow/react": "^12.0.0",
+    "dagre": "^0.8.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/dagre": "^0.7.3",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@types/uuid": "^9.0.0",
+    "@types/vscode": "^1.99.0",
+    "esbuild": "^0.21.0",
+    "typescript": "^5.4.0"
+  }
+}

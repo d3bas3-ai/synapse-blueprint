@@ -1,0 +1,27 @@
+# Source files — compiled into dist/
+src/**
+webview/**
+tsconfig.json
+esbuild.js
+
+# Node modules — bundled into dist/
+node_modules/**
+package-lock.json
+
+# Dev and project-specific files
+.vscode/**
+.claude/**
+.masf/**
+.mcp.json
+CLAUDE.md
+README.txt
+
+# Source maps — not needed in packaged extension
+dist/**/*.map
+
+# Already-built artifacts
+*.vsix
+
+# Git
+.git/**
+.gitignore
