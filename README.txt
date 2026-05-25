@@ -433,7 +433,11 @@ sidebar extensions — no special setup beyond the MCP config.
 
   Synapse Blueprint is free and built by an independent developer.
   If it saves you time and you would like to say thanks, a small donation
-  is always appreciated. No pressure — enjoying the extension is enough.
+  is always appreciated.
+
+    Ko-fi: https://ko-fi.com/d3bas3ai
+
+  No pressure — enjoying the extension is enough.
 
 
 ================================================================================

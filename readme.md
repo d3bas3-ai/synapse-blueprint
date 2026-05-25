@@ -509,6 +509,6 @@ See the [LICENSE](LICENSE) file for full terms, or visit [creativecommons.org/li
 
 Synapse Blueprint is free and built by an independent developer. If it saves you time and you would like to say thanks, a small donation is always appreciated.
 
-- [GitHub](https://github.com/d3bas3-ai)
+- [Ko-fi](https://ko-fi.com/d3bas3ai)
 
 No pressure. Enjoying the extension is enough.
